@@ -2,15 +2,27 @@ package com.example.huongdannauan.fragment;
 
 import android.os.Bundle;
 
+import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentTransaction;
 
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.EditText;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.example.huongdannauan.R;
+import com.example.huongdannauan.model.User;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
+import com.google.firebase.auth.AuthResult;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
 
 /**
  * A simple {@link Fragment} subclass.
@@ -19,6 +31,8 @@ import com.example.huongdannauan.R;
  */
 public class DangKyFragment extends Fragment {
     TextView dangNhap;
+    EditText edTenDN, edMail, edPas, edResetPass;
+    Button dangKy;
 
     // TODO: Rename parameter arguments, choose names that match
     // the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
@@ -65,8 +79,20 @@ public class DangKyFragment extends Fragment {
                              Bundle savedInstanceState) {
         // Inflate the layout for this fragment
         View view = inflater.inflate(R.layout.fragment_dang_ky, container, false);
-        dangNhap = (TextView) view.findViewById(R.id.txtDN);
+        dangNhap = (TextView) view.findViewById(R.id.txtDN); edTenDN = (EditText) view.findViewById(R.id.edtTenDN);
+        edMail = (EditText) view.findViewById(R.id.edMail);
+        edPas = (EditText) view.findViewById(R.id.edPass);
+        edResetPass = (EditText) view.findViewById(R.id.edResetPass);
+        dangKy = (Button) view.findViewById(R.id.btnDK);
+
         openFragmentOfUser(dangNhap, new DangNhapFragment());
+
+        dangKy.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                onClickSignUp();
+            }
+        });
         return view;
     }
     void openFragmentOfUser(TextView textView, Fragment fragment){
@@ -80,4 +106,77 @@ public class DangKyFragment extends Fragment {
             }
         });
     }
+
+    void onClickSignUp() {
+        String email = edMail.getText().toString().trim();
+        String password = edPas.getText().toString().trim();
+        String resetPassword = edResetPass.getText().toString().trim();
+        String TenDN = edTenDN.getText().toString().trim();
+
+        FirebaseAuth mAuth = FirebaseAuth.getInstance();
+
+        if (email.isEmpty() || password.isEmpty() || resetPassword.isEmpty()) {
+            Toast.makeText(requireContext(), "Email and password cannot be empty.", Toast.LENGTH_SHORT).show();
+            return; // Ngừng thực hiện nếu có trường rỗng
+        }
+
+        if (!password.equals(resetPassword)) { // Kiểm tra xem password có khớp với resetPassword không
+            Toast.makeText(requireContext(), "Passwords do not match.", Toast.LENGTH_SHORT).show();
+            return; // Ngừng nếu mật khẩu không khớp
+        }
+
+        mAuth.createUserWithEmailAndPassword(email, password)
+                .addOnCompleteListener(requireActivity(), new OnCompleteListener<AuthResult>() {
+                    @Override
+                    public void onComplete(@NonNull Task<AuthResult> task) {
+                        if (task.isSuccessful()) {
+                            addUser(TenDN,email);
+                            // Đăng ký thành công, chuyển hướng đến AccountFragment
+                            openAccountFragment(new AccountFragment());
+                        } else {
+                            // Nếu đăng ký thất bại, hiển thị thông báo cho người dùng
+                            String errorMessage = task.getException() != null ? task.getException().getMessage() : "Đăng ký thất bại.";
+                            Toast.makeText(requireContext(), errorMessage, Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                });
+    }
+
+    private void openAccountFragment(Fragment fragment) {
+        FragmentTransaction transaction = requireActivity().getSupportFragmentManager().beginTransaction();
+
+        if (getActivity() != null) {
+            Log.d("DangKyFragment", "Opening Account Fragment");
+            transaction.replace(R.id.fragment_container, fragment);
+            transaction.addToBackStack(null);
+            transaction.commit();
+        } else {
+            Log.e("DangKyFragment", "Activity is null, cannot open fragment");
+        }
+    }
+
+
+
+    void addUser(String name, String email) {
+        DatabaseReference database = FirebaseDatabase.getInstance().getReference("user");
+
+        // Tạo đối tượng người dùng mới
+        User newUser = new User("avata1.png",email, "", "", name, "","","");
+
+        // Thêm người dùng vào cơ sở dữ liệu
+        String userId = database.push().getKey(); // Tạo ID ngẫu nhiên cho người dùng
+        if (userId != null) {
+            database.child(userId).setValue(newUser).addOnCompleteListener(task -> {
+                if (task.isSuccessful()) {
+                    Log.d("Firebase", "Người dùng đã được thêm thành công: " + name);
+                } else {
+                    Log.e("Firebase", "Thêm người dùng không thành công: " + task.getException().getMessage());
+                }
+            });
+        } else {
+            Log.e("Firebase", "ID người dùng không hợp lệ.");
+
+        }
+    }
+
 }

@@ -113,7 +113,7 @@ public class DangNhapFragment extends Fragment {
         });
     }
 
-    void  SignIn()
+    void SignIn()
     {
         String email = edEmail.getText().toString().trim();
         String password = edPass.getText().toString().trim();
